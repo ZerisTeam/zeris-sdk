@@ -1,0 +1,11 @@
+[package]
+name = "zeris-rust-example"
+version = "0.1.0"
+description = "Rust example for Zeris SDK"
+edition = "2021"
+
+[dependencies]
+zeris-sdk = { path = "../../sdk/rust" }
+solana-sdk = "1.16"
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }

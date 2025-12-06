@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Setup Solana
+      run: |
+        sh -c "$(curl -sSfL https://release.solana.com/v1.16.0/install)"
+        echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+    - name: Setup Anchor
+      run: |
+        cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+        avm install 0.28.0
+        avm use 0.28.0
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+          node_modules
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/package-lock.json') }}
+
+    - name: Install Node.js dependencies
+      run: npm install
+
+    - name: Build TypeScript SDK
+      run: |
+        cd sdk/typescript
+        npm run build
+        npm run lint
+
+    - name: Test TypeScript SDK
+      run: |
+        cd sdk/typescript
+        npm test
+
+    - name: Build Rust SDK
+      run: |
+        cd sdk/rust
+        cargo build --release
+        cargo test
+
+    - name: Build Anchor Program
+      run: |
+        cd programs/zeris-validator
+        anchor build
+
+    - name: Run Anchor Tests
+      run: |
+        cd programs/zeris-validator
+        anchor test
+
+    - name: Check examples
+      run: |
+        cd examples/node-ts-example
+        npm install
+        npm run build
+
+        cd ../rust-example
+        cargo check
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Setup Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable
+
+    - name: Install Node.js dependencies
+      run: npm install
+
+    - name: Run ESLint
+      run: |
+        cd sdk/typescript
+        npm run lint
+
+    - name: Run Clippy
+      run: |
+        cd sdk/rust
+        cargo clippy -- -D warnings
+
+        cd ../../programs/zeris-validator
+        cargo clippy -- -D warnings
